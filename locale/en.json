@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Model group chat",
+    "description": "Open a group chat beside New Session. Browse chats in their own folder tree and configure one to four models, roles, and prompts. Participants answer independently with an optional summary. Files are never scanned or modified automatically."
+  }
+}

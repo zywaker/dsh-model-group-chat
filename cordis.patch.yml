@@ -1,0 +1,3 @@
+- insert:
+    - id: local-model-group-chat
+      name: '@local/dsh-model-group-chat'

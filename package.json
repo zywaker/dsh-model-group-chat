@@ -1,0 +1,56 @@
+﻿{
+    "name":  "dsh-model-group-chat",
+    "version":  "1.15.0",
+    "description":  "Multiple DSH models discuss one question together: independent answers, optional summary, free discussion, and per-member approved file access. · 在同一个群聊里让多个 DSH 模型独立作答、互相讨论，并按需读取项目文件。",
+    "license":  "MIT",
+    "type":  "module",
+    "keywords":  [
+                     "dsh",
+                     "deepseek-harness",
+                     "dsh-plugin",
+                     "group-chat",
+                     "multi-model",
+                     "plugin"
+                 ],
+    "engines":  {
+                    "dsh":  "0.2.2-rc.5"
+                },
+    "exports":  {
+                    ".":  "./index.js",
+                    "./client":  "./client.js",
+                    "./locale/*.json":  "./locale/*.json",
+                    "./icon":  "./icon.svg"
+                },
+    "files":  [
+                  "index.js",
+                  "host.js",
+                  "engine.js",
+                  "project-files.js",
+                  "project-overview.js",
+                  "project-access.js",
+                  "client.js",
+                  "cordis.patch.yml",
+                  "locale/*.json",
+                  "icon.svg",
+                  "README.md"
+              ],
+    "scripts":  {
+                    "test":  "node --test"
+                },
+    "dsh":  {
+                "bundle":  {
+                               "patch":  "./cordis.patch.yml"
+                           },
+                "client":  {
+                               "platform":  "web",
+                               "immediately":  true,
+                               "inject":  [
+                                              "@deepseek-ai/dsh-client-locale",
+                                              "@deepseek-ai/dsh-client-ui-layout",
+                                              "@deepseek-ai/dsh-client-ui-sidebar",
+                                              "@deepseek-ai/dsh-client-ui-workspace",
+                                              "@deepseek-ai/dsh-client-ui-chat"
+                                          ]
+                           }
+            }
+}
