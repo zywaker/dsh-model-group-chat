@@ -3,6 +3,7 @@ import { lstat, opendir } from 'node:fs/promises';
 import path from 'node:path';
 import { TextDecoder } from 'node:util';
 import { normalizeProjectPath } from './project-files.js';
+import { extractDocument, MAX_DOC_BYTES } from './extract.js';
 
 const MODES = new Set(['read-only', 'workspace-write', 'danger-full-access']);
 const MAX_FILE_BYTES = 16 * 1024;
@@ -10,6 +11,9 @@ const MAX_SCREEN_BYTES = 1024 * 1024;
 // Leave room under the Host's 20,000-character serialized result limit for
 // the path, cursor and other metadata (including a fully escaped path).
 const MAX_PAGE_JSON_CHARS = 17_000;
+// Office/PDF/image reading; plain text keeps the tighter byte path below.
+const DOCUMENT_EXTENSIONS = /\.(?:xlsx|xlsm|docx|pptx|pdf|png|jpe?g|gif|webp)$/iu;
+const DOCUMENT_PAGE_CHARS = 16_384;
 const MAX_CHANGE_BYTES = 4 * 1024;
 const MAX_CREATE_BYTES = 8 * 1024;
 const MAX_PATH = 1024;
@@ -18,6 +22,8 @@ const MAX_DIRECTORY_SIZE = 512;
 const MAX_CURSOR_CHARS = 2048;
 const EXTRA_TEXT_NAMES = /^(?:go\.(?:mod|sum|work|work\.sum)|cargo\.lock|poetry\.lock|uv\.lock|yarn\.lock|bun\.lock|flake\.lock|gemfile\.lock|composer\.lock|deno\.lock|pipfile(?:\.lock)?|justfile|vagrantfile|brewfile|jenkinsfile|build(?:\.bazel)?|workspace(?:\.bazel)?|module\.bazel|gradlew|cmakelists\.txt)$/iu;
 const EXTRA_TEXT_EXTENSIONS = /\.(?:lock|bzl|nix|rego|cuh?|f(?:90|95|03|08)?|for|jl|nim|rkt|lisp|el|scm|sbt|groovy|ipynb|webmanifest|map|http|log)$/iu;
+// Readable binaries: extraction happens below the UTF-8 fast path.
+const EXTRA_DOCUMENT_EXTENSIONS = /\.(?:xlsx|xlsm|docx|pptx|pdf|png|jpe?g|gif|webp)$/iu;
 const MAX_WIRE_CHARS = 64 * 1024;
 const KNOWN_SECRET = /-----BEGIN (?:[A-Z0-9]+ ){0,4}(?:PRIVATE KEY|OPENSSH PRIVATE KEY)-----|\b(?:gh[pousr]_[A-Za-z0-9]{32,}|github_pat_[A-Za-z0-9_]{50,}|xox[baprs]-[A-Za-z0-9-]{12,}|(?:AKIA|ASIA)[A-Z0-9]{16}|AIza[A-Za-z0-9_-]{35}|(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{16,}|sk-(?:(?:proj|svcacct|ant-api03)-)?[A-Za-z0-9_-]{24,}|npm_[A-Za-z0-9]{36}|eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{12,})\b/u;
 const SECRET_VALUE = /(?:^|[,\s{])(?:(?:export|const|let|var)[^\S\r\n]+)?["']?(?:[A-Za-z][A-Za-z0-9_-]*[_-])?(?:api[-_]?key|access[-_]?token|refresh[-_]?token|auth[-_]?token|bearer[-_]?token|secret[-_]?key|client[-_]?secret|private[-_]?key|secret[-_]?access[-_]?key|password|passwd|credentials?|secrets?|tokens?)["']?[^\S\r\n]*[:=][^\S\r\n]*(?:"([^"\r\n]{4,})"|'([^'\r\n]{4,})'|([A-Za-z0-9!$%&*+./:@^_=-]{4,})(?=[^\S\r\n]*(?:$|[#;},])))/gimu;
@@ -102,7 +108,7 @@ function validateSpelling(value, directory) {
   try { normalizeProjectPath(specimen); } catch (error) {
     const name = segments.at(-1);
     if (directory || error?.code !== 'blocked-file' ||
-        !(EXTRA_TEXT_NAMES.test(name) || EXTRA_TEXT_EXTENSIONS.test(name))) {
+        !(EXTRA_TEXT_NAMES.test(name) || EXTRA_TEXT_EXTENSIONS.test(name) || EXTRA_DOCUMENT_EXTENSIONS.test(name))) {
       reject(error?.code === 'invalid-path' ? 'path' : 'blocked');
     }
     // Reuse all original name/ancestor checks; appending a permitted extension
@@ -272,16 +278,18 @@ export function createProjectAccess({ fs, root, mode, allowWrites, approve, sign
   async function read(value, cursor) {
     const selected = await getTarget(value);
     const size = selected.info.size;
+    const name = selected.display.split('/').pop() ?? '';
+    if (DOCUMENT_EXTENSIONS.test(name)) return await readDocument(value, selected, size, cursor);
     if (size > MAX_SCREEN_BYTES) reject('tooLarge');
     checkSignal();
     const bytes = await fs.readBytes(selected.target, signal, size <= MAX_FILE_BYTES ? MAX_FILE_BYTES : MAX_SCREEN_BYTES);
     const fresh = await getTarget(value);
     if (!matchTarget(selected, fresh) || !(bytes instanceof Uint8Array) || bytes.byteLength !== size) reject('stale');
+    let screened;
+    try { screened = new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch { reject('nontext'); }
     const snapshot = scope(`read:${createHash('sha256').update(bytes).digest('hex')}`, fresh);
     const position = cursorPosition(cursor, snapshot);
     if (!Number.isSafeInteger(position) || position < 0 || position > size) reject('cursor');
-    let screened;
-    try { screened = new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch { reject('nontext'); }
     checkText(screened, MAX_SCREEN_BYTES);
     checkSignal();
     const decode = new TextDecoder('utf-8', { fatal: true, ignoreBOM: position !== 0 });
@@ -303,6 +311,32 @@ export function createProjectAccess({ fs, root, mode, allowWrites, approve, sign
     if (!eof) page.nextCursor = makeCursor(snapshot, end);
     return page;
   }
+  // Office, PDF and image files are converted to bounded plain text first, so
+  // the model receives readable content instead of a "not UTF-8" error.
+  async function readDocument(value, selected, size, cursor) {
+    if (size > MAX_DOC_BYTES) reject('tooLarge');
+    checkSignal();
+    const bytes = await fs.readBytes(selected.target, signal, Math.max(size, 1));
+    const fresh = await getTarget(value);
+    if (!matchTarget(selected, fresh) || !(bytes instanceof Uint8Array) || bytes.byteLength !== size) reject('stale');
+    const name = fresh.display.split('/').pop() ?? '';
+    const result = extractDocument(bytes, name);
+    if (!result.ok) reject(result.code === 'tooLarge' ? 'tooLarge' : result.code === 'nontext' ? 'nontext' : 'failure');
+    checkText(result.text, MAX_DOC_BYTES);
+    checkSignal();
+    const snapshot = scope(`doc:${createHash('sha256').update(result.text).digest('hex')}`, fresh);
+    const position = cursorPosition(cursor, snapshot);
+    if (!Number.isSafeInteger(position) || position < 0 || position > result.text.length) reject('cursor');
+    let end = Math.min(result.text.length, position + DOCUMENT_PAGE_CHARS);
+    if (/[\uD800-\uDBFF]/u.test(result.text[end - 1] ?? '')) end -= 1;
+    const content = result.text.slice(position, end);
+    const eof = end >= result.text.length;
+    const page = { path: fresh.display, format: result.format, content, offset: position, length: content.length, eof };
+    if (result.image) page.image = true;
+    if (!eof) page.nextCursor = makeCursor(snapshot, end);
+    return page;
+  }
+
   async function list(value, cursor) {
     const selected = await getTarget(value, { directory: true });
     // Native listDir has no producer cap. Preflight directory size incrementally,
