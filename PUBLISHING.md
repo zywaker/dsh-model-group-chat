@@ -1,4 +1,4 @@
-﻿# 发布到插件市场 / Publishing
+# 发布到插件市场 / Publishing
 
 这个目录是一个可直接推送到 GitHub 的 DSH 插件仓库。
 
