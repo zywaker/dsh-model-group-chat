@@ -51,6 +51,7 @@ window.__ModuleLoader__.load({
       projectContext: 'Project excerpts', truncatedExcerpt: 'Excerpt truncated',
       unknownRead: 'Could not load this view. Refresh and try again.', unknownCreate: 'Creation could not be confirmed. Retrying with the same details will not create a duplicate.',
       unknownStop: 'Could not confirm that the discussion stopped. Refresh to check its status.',
+      attach: 'Add files or images', removeAttachment: 'Remove attachment', attachFailed: 'Could not attach this file.', attachedFiles: 'Attachments',
       recipient: 'Send to', everyone: 'All members', me: 'You', placeholder: 'Type a question or a follow-up…',
       send: 'Send to group', sendOne: 'Send to member', cancel: 'Stop', stopping: 'Stopping…', older: 'Show earlier messages',
       creating: 'Creating…', missingWorkspace: 'This workspace is no longer registered. You can still view the history.',
@@ -126,6 +127,7 @@ window.__ModuleLoader__.load({
       projectContext: '项目摘录', truncatedExcerpt: '摘录已截断',
       unknownRead: '无法加载当前内容，请刷新重试。', unknownCreate: '无法确认是否创建成功。用相同设置重试不会重复创建。',
       unknownStop: '无法确认是否已停止，请刷新查看状态。',
+      attach: '添加文件或图片', removeAttachment: '移除附件', attachFailed: '附件上传失败。', attachedFiles: '附件',
       recipient: '发送给', everyone: '全体成员', me: '你', placeholder: '输入问题或继续追问…',
       send: '发给群成员', sendOne: '发给指定成员', cancel: '停止', stopping: '正在停止…', older: '展开更早的消息',
       creating: '正在创建…', missingWorkspace: '该工作区已被移除，仍可查看讨论历史。',
@@ -203,6 +205,7 @@ window.__ModuleLoader__.load({
       .mgc-recipient{position:relative;min-width:0;max-width:calc(100% - 48px);z-index:3}.mgc-page .mgc-recipient-trigger{display:flex;align-items:center;gap:8px;min-width:0;max-width:min(360px,100%);padding:5px 10px;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-lg,14px);background:var(--dsw-alias-bg-base);font-size:13px}.mgc-recipient-trigger>svg{flex:none}.mgc-recipient-menu{position:absolute;inset-inline-start:0;inset-block-end:calc(100% + 6px);min-width:100%;width:min(360px,calc(100cqw - 56px));max-height:min(220px,35dvh);overflow:auto;padding:4px;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-panel,14px);background:var(--dsw-alias-bg-base);box-shadow:var(--dsw-elevation-soft)}.mgc-recipient-option{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:33px;padding:5px 8px;border-radius:var(--dsw-radius-md,8px);cursor:pointer;font-size:13px}.mgc-recipient-option:focus,.mgc-recipient-option:hover,.mgc-recipient-option[aria-selected='true']{background:var(--dsw-alias-interactive-bg-hover)}.mgc-recipient-option:focus-visible{outline-offset:-2px}
       .mgc-recipient-trigger[aria-expanded='true']>svg{transform:rotate(180deg)}.mgc-recipient-menu:popover-open{position:fixed;inset:auto;margin:0;box-sizing:border-box;width:var(--mgc-menu-width);min-width:0;max-height:var(--mgc-menu-height);left:var(--mgc-menu-left);top:var(--mgc-menu-top);color:var(--dsw-alias-label-primary)}
       .mgc-free-talk{flex:none;white-space:nowrap}.mgc-free-talk[aria-pressed=true]{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-interactive-bg-hover)}.mgc-send-active{outline:2px solid var(--dsw-alias-button-info-fill);outline-offset:2px}
+      .mgc-attachments{display:flex;flex-wrap:wrap;gap:6px;margin:0 auto 6px;width:min(100%,calc(var(--mgc-chat-width,748px) + 32px))}.mgc-attachment{display:inline-flex;align-items:center;gap:4px;max-width:100%;padding:2px 4px 2px 8px;border-radius:9px;background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-secondary);font-size:12px}.mgc-attachment .mgc-truncate{max-width:220px}
       .mgc-compose-bar{display:flex;justify-content:space-between;align-items:center;gap:10px}.mgc-compose-controls{display:flex;flex-wrap:wrap;align-items:center;gap:4px;min-width:0}.mgc-compose-controls .mgc-recipient{max-width:100%}.mgc-compose-progress{min-width:0;margin-inline-start:auto;text-align:end}.mgc-small-select{font-size:13px!important;max-width:min(280px,100%);cursor:pointer}
       .mgc-project-toggle{display:inline-flex;align-items:center;gap:6px;min-height:30px;padding:2px 7px;border-radius:var(--dsw-radius-md,8px);color:var(--dsw-alias-label-secondary);font-size:13px;cursor:pointer}
       .mgc-project-toggle input{accent-color:var(--dsw-alias-state-business-primary)}.mgc-project-toggle[data-on='true']{background:var(--dsw-alias-interactive-bg-hover)}
@@ -306,6 +309,7 @@ window.__ModuleLoader__.load({
       folder: 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z',
       chevron: 'm6 9 6 6 6-6', stop: 'M8 8h8v8H8z', down: 'M12 5v14m-6-6 6 6 6-6', refresh: 'M19 8a8 8 0 1 0 .7 6M19 4v4h-4', sidebar: 'M4 5h16v14H4zM10 5v14',
       file: 'M6 3h8l4 4v14H6zM14 3v5h4M9 12h6m-6 4h6',
+      clip: 'M9 12.5 15.5 6a2.5 2.5 0 0 1 3.5 3.5L11 17.5a4.5 4.5 0 0 1-6.4-6.4L11 4.7',
     };
     function Glyph({ name, size = 16 }) {
       return h('svg', { width: size, height: size, viewBox: '0 0 24 24', fill: name === 'stop' ? 'currentColor' : 'none', 'aria-hidden': true },
@@ -607,6 +611,9 @@ window.__ModuleLoader__.load({
           h('div', { className: 'mgc-muted' }, t('me'), direct ? ` → ${direct}` : '', ' · ', h('time', { dateTime: turn.createdAt }, timestamp)),
           h('div', { className: 'mgc-user-bubble' }, turn.text),
           turn.fileAccessed === true && h('p', { className: 'mgc-muted' }, t('fileAccessed')),
+          turn.attachments?.length > 0 && h('div', { className: 'mgc-attachments' },
+            turn.attachments.map((item, index) => h('span', { key: `${index}:${item.name}`, className: 'mgc-attachment' },
+              `${item.kind === 'image' ? '🖼 ' : ''}${item.name}`))),
           turn.project?.files?.length > 0 && h('details', { className: 'mgc-project-context', open: false },
             h('summary', null, h('bdi', null, `${turn.project.name} · ${t('projectContext')}`)),
             turn.project.files.map(file => h('div', { className: 'mgc-project-excerpt', key: file.path },
@@ -907,6 +914,9 @@ window.__ModuleLoader__.load({
       const scrollId = useId();
       const [room, setRoom] = useState(seed ?? null);
       const [draftState, setDraftState] = useState(() => drafts.get(id) ?? emptyDraft);
+      const [uploads, setUploads] = useState([]);
+      const [uploading, setUploading] = useState(false);
+      const fileInput = useRef(null);
       const { text: draft, recipient } = draftState;
       const editor = useRef(null), settings = useRef(null), folderControl = useRef(null), stopFocus = useRef(false), scroll = useRef(null), following = useRef(true), composing = useRef(false);
       const [showJump, setShowJump] = useState(false);
@@ -1041,6 +1051,26 @@ window.__ModuleLoader__.load({
       function canFreeTalk(current, state) {
         return current?.capabilities?.freeTalk === true && current.members.length >= 2 && !state.recipient;
       }
+      async function attachFiles(event) {
+        const files = [...(event.target.files ?? [])].slice(0, 3);
+        event.target.value = '';
+        if (!files.length || uploading) return;
+        setUploading(true); setActionError(null);
+        try {
+          for (const file of files) {
+            if (file.size > 8 * 1024 * 1024) throw Object.assign(new Error('too large'), { code: 'attachment-too-large' });
+            const data = await new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
+              reader.onerror = () => reject(reader.error);
+              reader.readAsDataURL(file);
+            });
+            const uploaded = await request('upload-attachment', { roomId: id, name: file.name, mime: file.type || 'application/octet-stream', data });
+            setUploads(list => [...list.filter(item => item.id !== uploaded.id), uploaded].slice(-3));
+          }
+        } catch (err) { setActionError({ err, which: 'attach' }); }
+        finally { setUploading(false); }
+      }
       function canSend(current, state) {
         return current && current.members.length > 0 && state.text.trim() && !current.active && current.workspaceAvailable && !current.storageFailed
           && (!state.recipient || current.memberKeys.includes(state.recipient));
@@ -1056,14 +1086,15 @@ window.__ModuleLoader__.load({
           if (which === 'send') {
             const identity = { current: current.identity };
             args = withRequestId(identity, { roomId: id, text: current.text.trim(), ...(current.recipient ? { recipientKey: current.recipient } : {}),
-              ...(current.freeTalk && canFreeTalk(last.current, current) ? { freeTalk: true } : {}), share: true }, true);
+              ...(current.freeTalk && canFreeTalk(last.current, current) ? { freeTalk: true } : {}),
+              ...(uploads.length ? { attachmentIds: uploads.map(item => item.id) } : {}), share: true }, true);
             setRoomDraft({ ...current, identity: identity.current });
             pending = navigation.pendingSends.get(id) ?? new Map();
             pending.set(args.requestId, true);
             navigation.pendingSends.set(id, pending);
           }
           const next = await request(which, args, ctl.signal);
-          if (!ctl.signal.aborted) accept(next);
+          if (!ctl.signal.aborted) { accept(next); if (which === 'send') setUploads([]); }
         } catch (err) {
           if (ctl.signal.aborted) return;
           if (pending && !pending.has(args.requestId)) return; // A concurrent room read already confirmed this send.
@@ -1132,7 +1163,9 @@ window.__ModuleLoader__.load({
             !room.workspaceAvailable && h(Notice, null, t('missingWorkspace')),
             room.storageFailed && h(Notice, { role: 'alert' }, t('storageFailed')),
             missingAudience && h(Notice, { role: 'alert' }, t('formerAudience')),
-            actionError && h(Notice, { role: 'alert' }, errText(t, actionError.err, actionError.which === 'send' ? 'unknownError' : actionError.which === 'folder' ? 'folderPickerUnavailable' : 'unknownStop'))),
+            actionError && h(Notice, { role: 'alert' }, errText(t, actionError.err,
+            actionError.which === 'send' ? 'unknownError' : actionError.which === 'folder' ? 'folderPickerUnavailable'
+              : actionError.which === 'attach' ? 'attachFailed' : 'unknownStop'))),
           pendingApproval && h(FileApproval, { key: pendingApproval.id, t, approval: pendingApproval, deciding: decidingApproval !== null,
             stopping: Boolean(action), reviewSharing: !lastTurn?.recipientKey && (lastTurn?.members?.length ?? room.members.length) > 1,
             onDecide: decideFileWrite, onStop: () => run('cancel'),
@@ -1144,6 +1177,11 @@ window.__ModuleLoader__.load({
             projectAccess && h('button', { type: 'button', className: 'mgc-quiet mgc-file-badge', 'aria-haspopup': 'dialog',
               disabled: choosingFolder, onClick: () => setSettings(true) }, `${t('fileAccess')}: ${t(fileModes[effectiveMode])}`),
             projectAccess && !room.projectContextAvailable && h('span', { className: 'mgc-muted mgc-folder-context-status' }, t('projectFolderUnavailable'))),
+          uploads.length > 0 && h('div', { className: 'mgc-attachments', 'aria-label': t('attachedFiles') },
+            uploads.map(item => h('span', { key: item.id, className: 'mgc-attachment' },
+              h('span', { className: 'mgc-truncate' }, `${item.kind === 'image' ? '🖼 ' : ''}${item.name}`),
+              h('button', { type: 'button', className: 'mgc-icon-button', 'aria-label': t('removeAttachment'), title: t('removeAttachment'),
+                disabled: Boolean(action), onClick: () => setUploads(list => list.filter(entry => entry.id !== item.id)) }, h(Glyph, { name: 'close', size: 12 }))))),
           h('form', { className: 'mgc-composer', onSubmit: event => run('send', event) },
             h('textarea', { ref: editor, 'aria-label': t('placeholder'), placeholder: t('placeholder'), value: draft, rows: 2, maxLength: 8000,
               readOnly: action === 'send', disabled: !room.workspaceAvailable || room.storageFailed,
@@ -1155,6 +1193,11 @@ window.__ModuleLoader__.load({
               } }),
             h('div', { className: 'mgc-compose-bar' },
               h('div', { className: 'mgc-compose-controls' },
+                h('input', { type: 'file', ref: fileInput, multiple: true, hidden: true, onChange: attachFiles,
+                  accept: 'image/png,image/jpeg,image/webp,image/gif,.xlsx,.docx,.pptx,.pdf,.csv,.txt,.md,.json,.xml,.html' }),
+                h('button', { type: 'button', className: 'mgc-icon-button', title: t('attach'), 'aria-label': t('attach'),
+                  disabled: Boolean(action) || uploading || !room.members.length, onClick: () => fileInput.current?.click() },
+                  uploading ? h('span', { className: 'mgc-muted' }, '…') : h(Glyph, { name: 'clip', size: 15 })),
                 h(RecipientPicker, { t, members: room.members, value: recipient,
                   onChange: value => updateDraft({ recipient: value, ...(value ? { freeTalk: false } : {}) }), disabled: Boolean(action) || room.active }),
                 canFreeTalk(room, draftState) && h('button', { type: 'button', className: 'mgc-quiet mgc-free-talk', 'aria-pressed': freeTalkSelected,
