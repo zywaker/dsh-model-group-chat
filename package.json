@@ -1,6 +1,6 @@
 {
     "name":  "dsh-model-group-chat",
-    "version":  "1.15.1",
+    "version":  "1.15.2",
     "description":  "Multiple DSH models discuss one question together: independent answers, optional summary, free discussion, and per-member approved file access. · 在同一个群聊里让多个 DSH 模型独立作答、互相讨论，并按需读取项目文件。",
     "license":  "MIT",
     "type":  "module",
