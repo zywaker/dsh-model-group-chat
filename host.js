@@ -4,6 +4,7 @@ import { access, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { DISCUSSION_PHASE_INSTRUCTIONS, MAX_WRITES_PER_TURN, runDiscussion } from './engine.js';
 import { createProjectAccess, supportsProjectAccess } from './project-access.js';
+import { extractDocument } from './extract.js';
 
 export const FILE_MODES = Object.freeze(['read-only', 'workspace-write', 'danger-full-access']);
 const DEFAULT_FILE_MODE = FILE_MODES[0];
@@ -31,7 +32,8 @@ const ACTION_FIELDS = new Map([
   ['bind-folder', ['roomId', 'path', 'expectedRevision']],
   ['use-default-folder', ['roomId', 'expectedRevision']],
   ['configure', ['roomId', 'title', 'memberKeys', 'moderatorKey', 'writerKey', 'roles', 'rolePrompts', 'expectedRevision']],
-  ['send', ['roomId', 'text', 'recipientKey', 'freeTalk', 'share', 'requestId']], ['cancel', ['roomId']],
+  ['upload-attachment', ['roomId', 'name', 'mime', 'data']],
+  ['send', ['roomId', 'text', 'recipientKey', 'freeTalk', 'attachmentIds', 'share', 'requestId']], ['cancel', ['roomId']],
 ]);
 const FAILURE = new Map([
   ['invalid-request', [400, 'Check the request fields and try again.']],
@@ -59,6 +61,9 @@ const FAILURE = new Map([
   ['share-required', [403, 'A human must explicitly send the discussion to the selected model providers.']],
   ['unavailable', [503, 'Model group chat is restarting. Reload and try again.']],
   ['storage-failed', [503, 'Discussion could not be saved. Reload before trying again.']],
+  ['attachment-invalid', [415, 'This image was refused by the attachment service.']],
+  ['attachment-unsupported', [415, 'This file type cannot be read here; convert it to text, CSV or a supported document.']],
+  ['attachment-too-large', [413, 'This attachment is too large.']],
 ]);
 class RoomError extends Error {
   constructor(code) { super(FAILURE.get(code)[1]); this.code = code; }
@@ -204,10 +209,25 @@ function participantSystem(phase, personalRole, rolePrompt, tools = []) {
   ].filter(Boolean).join('\n\n');
 }
 export function createProviderCaller(llm, timeoutMs = 120000) {
-  return ({ model, phase, text, signal, fileAccess }) => deadline(signal, timeoutMs, async callSignal => {
+  return ({ model, phase, text, signal, fileAccess, attachments = [] }) => deadline(signal, timeoutMs, async callSignal => {
     const access = fileAccess?.(callSignal);
     const tools = access?.schemas ?? [];
-    const messages = [{ role: 'user', content: [{ type: 'text', text }] }];
+    const imageBlocks = attachments.flatMap(item => (item?.kind === 'image' ? item.blocks ?? [] : []));
+    let acceptsImages = false;
+    if (imageBlocks.length) {
+      try {
+        const info = await llm.resolveModelInfo(model.provider, model.model, callSignal);
+        acceptsImages = info?.inputModalities?.includes('image') === true;
+      } catch { acceptsImages = false; }
+    }
+    const notes = attachments.map(item => {
+      if (item?.kind === 'image') {
+        return acceptsImages ? '' : `\n\n[Attached image: ${item.name} (${item.size} bytes). This model does not accept image input, so only this note is sent.]`;
+      }
+      return item?.text ? `\n\n[Attached file: ${item.name}]\n${item.text}` : `\n\n[Attached file: ${item.name} (${item.size} bytes)]`;
+    }).join('');
+    const content = [{ type: 'text', text: `${text}${notes}` }, ...(acceptsImages ? imageBlocks : [])];
+    const messages = [{ role: 'user', content }];
     const config = {
       provider: model.provider, model: model.model, purpose: 'model-group-chat',
       system: participantSystem(phase, model.role, model.rolePrompt, tools),
@@ -291,7 +311,7 @@ function withTurn(room, turn) {
 }
 
 export function createChatService({ table, registry, llm, log = () => {}, timeoutMs, catalogTimeoutMs = 8000,
-  clock = Date.now, fs }) {
+  clock = Date.now, fs, attachments }) {
   const active = new Map();
   const capabilities = Object.freeze({ ...CAPABILITIES, ...(supportsProjectAccess(fs) ? { projectAccess: true } : {}) });
   const degraded = new Set();
@@ -453,7 +473,7 @@ export function createChatService({ table, registry, llm, log = () => {}, timeou
     const outsideAllowed = new Set(Array.from(turn.text.matchAll(/"([^"\r\n]+)"|`([^`\r\n]+)`/g), match => match[1] ?? match[2]));
     active.set(room.id, running);
     const names = new Map(room.members.map(member => [member.key, member]));
-    const participant = args => call({ ...args,
+    const participant = args => call({ ...args, attachments: turn.attachments ?? [],
       ...(root && capabilities.projectAccess && args.phase !== 'summary' ? {
         fileAccess: signal => {
           let approvedChange;
@@ -581,6 +601,33 @@ export function createChatService({ table, registry, llm, log = () => {}, timeou
         if (!approval || approval.view.id !== req.approvalId) fail('file-approval-expired');
         approval.finish(req.approve);
         return detail(lookup(room.id));
+      }
+      case 'upload-attachment': {
+        if (authority !== 'human') fail('owner-required');
+        const room = lookup(req.roomId);
+        if (room.isDraft) fail('room-unconfigured');
+        const name = field(req.name, 200);
+        const mime = field(req.mime, 120);
+        if (typeof req.data !== 'string' || req.data.length > 16_000_000) fail('attachment-too-large');
+        const bytes = Buffer.from(req.data, 'base64');
+        if (!bytes.length || bytes.length > 8 * 1024 * 1024) fail('attachment-too-large');
+        const isImage = /^image\/(?:png|jpeg|webp|gif)$/u.test(mime);
+        const id = randomUUID();
+        const entry = { id, name, mime, size: bytes.length, kind: isImage ? 'image' : 'file' };
+        if (isImage) {
+          if (!attachments) fail('attachment-unsupported');
+          try {
+            entry.blocks = await attachments.admitPromptContent([{ type: 'image', data: req.data, mediaType: mime, name }]);
+          } catch { fail('attachment-invalid'); }
+        } else {
+          const extracted = extractDocument(bytes, name);
+          if (!extracted.ok) fail(extracted.code === 'tooLarge' ? 'attachment-too-large' : 'attachment-unsupported');
+          entry.format = extracted.format;
+          entry.text = extracted.text.slice(0, 12_000);
+        }
+        const uploads = [...(room.uploads ?? []).filter(item => item.id !== id), entry].slice(-30);
+        await persist(room.id, current => ({ ...current, uploads, updatedAt: new Date().toISOString(), revision: current.revision + 1 }));
+        return { id, name, mime, size: entry.size, kind: entry.kind, ...(entry.format ? { format: entry.format } : {}) };
       }
       case 'create-draft': {
         if (authority !== 'human') fail('owner-required');
@@ -723,6 +770,8 @@ export function createChatService({ table, registry, llm, log = () => {}, timeou
         const dedupe = requestId(req.requestId);
         const text = field(req.text, LIMITS.text, true);
         const recipientKey = req.recipientKey === undefined ? undefined : field(req.recipientKey, 1000);
+        const attachmentIds = req.attachmentIds === undefined ? [] : req.attachmentIds;
+        if (!Array.isArray(attachmentIds) || attachmentIds.length > 3 || attachmentIds.some(id => typeof id !== 'string' || id.length > 64)) fail('invalid-request');
         if (req.freeTalk !== undefined && typeof req.freeTalk !== 'boolean') fail('invalid-request');
         const freeTalk = req.freeTalk === true;
         const sent = await serial(async () => {
@@ -740,11 +789,17 @@ export function createChatService({ table, registry, llm, log = () => {}, timeou
           if (room.turns.length >= LIMITS.turns) fail('turn-limit');
           if (recipientKey !== undefined && !room.memberKeys.includes(recipientKey)) fail('invalid-request');
           if (freeTalk && (recipientKey !== undefined || room.memberKeys.length < 2)) fail('invalid-request');
+          const picked = attachmentIds.length
+            ? (room.uploads ?? []).filter(item => attachmentIds.includes(item.id))
+            : [];
+          if (picked.length !== attachmentIds.length) fail('invalid-request');
+          const attachments = picked.map(({ name, mime, size, kind, text, blocks }) => ({ name, mime, size, kind,
+            ...(text === undefined ? {} : { text }), ...(blocks === undefined ? {} : { blocks }) }));
           const project = { name: projectLabel(room), files: [] };
           const root = capabilities.projectAccess ? await deadline(undefined, 2500, () => projectPath(room)).catch(() => undefined) : undefined;
           if (closed) fail('unavailable');
           const turn = snapshotTurn(room, { id: dedupe ?? randomUUID(), text, ...(recipientKey === undefined ? {} : { recipientKey }),
-            project, ...(freeTalk ? { freeTalk: true } : {}), ...(root ? { fileMode: room.fileMode ?? DEFAULT_FILE_MODE } : {}),
+            project, ...(attachments.length ? { attachments } : {}), ...(freeTalk ? { freeTalk: true } : {}), ...(root ? { fileMode: room.fileMode ?? DEFAULT_FILE_MODE } : {}),
             status: 'running', phase: recipientKey === undefined ? 'ideas' : 'reply', createdAt: new Date().toISOString(), entries: [] });
           const start = await persist(room.id, latest => {
             if (latest.revision !== room.revision || latest.turns.at(-1)?.status === 'running') fail('stale-revision');
