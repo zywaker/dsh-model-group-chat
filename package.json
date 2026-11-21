@@ -1,7 +1,7 @@
 {
     "name":  "dsh-model-group-chat",
-    "version":  "1.16.1",
-    "description":  "Multiple DSH models discuss one question together: independent answers, optional summary, free discussion, approved file access, and paged reads of text, Office, PDF and image files.",
+    "version":  "1.17.0",
+    "description":  "Multiple DSH models discuss one question together: independent answers, optional summary, free discussion, approved file access, paged reads of Office/PDF/image files, and chat attachments.",
     "license":  "MIT",
     "type":  "module",
     "keywords":  [
