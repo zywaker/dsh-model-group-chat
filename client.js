@@ -51,6 +51,7 @@ window.__ModuleLoader__.load({
       projectContext: 'Project excerpts', truncatedExcerpt: 'Excerpt truncated',
       unknownRead: 'Could not load this view. Refresh and try again.', unknownCreate: 'Creation could not be confirmed. Retrying with the same details will not create a duplicate.',
       unknownStop: 'Could not confirm that the discussion stopped. Refresh to check its status.',
+      thinking: 'Reasoning', toolCall: 'Tool', changedFiles: 'Changed files', noDiff: 'No text diff available.',
       attach: 'Add files or images', removeAttachment: 'Remove attachment', attachFailed: 'Could not attach this file.', attachedFiles: 'Attachments',
       recipient: 'Send to', everyone: 'All members', me: 'You', placeholder: 'Type a question or a follow-up…',
       send: 'Send to group', sendOne: 'Send to member', cancel: 'Stop', stopping: 'Stopping…', older: 'Show earlier messages',
@@ -127,6 +128,7 @@ window.__ModuleLoader__.load({
       projectContext: '项目摘录', truncatedExcerpt: '摘录已截断',
       unknownRead: '无法加载当前内容，请刷新重试。', unknownCreate: '无法确认是否创建成功。用相同设置重试不会重复创建。',
       unknownStop: '无法确认是否已停止，请刷新查看状态。',
+      thinking: '思考过程', toolCall: '工具调用', changedFiles: '已修改文件', noDiff: '没有可显示的文本差异。',
       attach: '添加文件或图片', removeAttachment: '移除附件', attachFailed: '附件上传失败。', attachedFiles: '附件',
       recipient: '发送给', everyone: '全体成员', me: '你', placeholder: '输入问题或继续追问…',
       send: '发给群成员', sendOne: '发给指定成员', cancel: '停止', stopping: '正在停止…', older: '展开更早的消息',
@@ -187,6 +189,16 @@ window.__ModuleLoader__.load({
       .mgc-page [role='alert']{margin-block:6px}.mgc-user{display:flex;flex-direction:column;align-items:flex-end;gap:5px;margin-bottom:15px}
       .mgc-user-bubble{white-space:pre-wrap;max-width:min(calc(var(--mgc-chat-width,748px) * .702),82%);padding:10px 14px;border-radius:var(--dsw-radius-panel,16px);background:var(--dsw-specific-selector,var(--dsw-alias-interactive-bg-hover));font-size:var(--dsh-content-font-size,14px);line-height:1.65}
       .mgc-bot{display:flex;align-items:flex-start;gap:11px;margin-block:12px 20px}.mgc-avatar{display:grid;place-items:center;width:30px;height:30px;flex:none;border-radius:var(--dsw-radius-md,8px);background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-secondary);font-size:12px;font-weight:600}
+      .mgc-thinking{margin-block:0 6px;font-size:12px;color:var(--dsw-alias-label-secondary)}
+      .mgc-thinking summary{cursor:pointer;width:fit-content}
+      .mgc-thinking-text{max-block-size:min(30dvh,220px);overflow:auto;margin:5px 0 0;padding:7px 9px;white-space:pre-wrap;overflow-wrap:anywhere;border-radius:9px;background:var(--dsw-alias-interactive-bg-hover);font-size:12px;line-height:1.55}
+      .mgc-activity{display:grid;gap:3px;margin:0 0 6px;padding:0;list-style:none;font-size:12px;color:var(--dsw-alias-label-secondary)}
+      .mgc-changes{margin-block:8px 12px;font-size:12px}
+      .mgc-changes summary{cursor:pointer;width:fit-content;color:var(--dsw-alias-label-secondary)}
+      .mgc-change{display:grid;gap:4px;margin-block-start:6px;padding:7px 9px;border:1px solid var(--dsw-alias-border-l3);border-radius:10px}
+      .mgc-change-old,.mgc-change-new{max-block-size:min(24dvh,180px);overflow:auto;margin:0;padding:5px 7px;white-space:pre-wrap;overflow-wrap:anywhere;border-radius:8px;font-size:12px;line-height:1.5}
+      .mgc-change-old{background:color-mix(in srgb,var(--dsw-alias-interactive-bg-hover) 60%,transparent)}
+      .mgc-change-new{background:color-mix(in srgb,var(--dsw-alias-state-business-primary) 12%,transparent)}
       .mgc-bot-content{min-width:0;flex:1}.mgc-message-meta{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;margin-block-end:5px;font-size:13px}.mgc-message-meta strong{font-weight:600;color:var(--dsw-alias-label-primary)}
       .mgc-role{color:var(--dsw-alias-label-secondary);background:var(--dsw-alias-interactive-bg-hover);border-radius:var(--dsw-radius-sm,4px);padding:0 5px;overflow-wrap:anywhere}
       .mgc-bot-bubble{--mgc-bubble-fill:color-mix(in srgb,var(--dsw-alias-bg-base) 95%,var(--dsw-alias-label-primary));position:relative;width:fit-content;min-width:0;max-width:100%;padding:10px 13px;border:1px solid var(--dsw-alias-border-l3);border-radius:var(--dsw-radius-lg,12px);background:var(--mgc-bubble-fill);color:var(--dsw-alias-label-primary)}
@@ -592,6 +604,12 @@ window.__ModuleLoader__.load({
             entry.phase === 'summary' && h('span', { className: 'mgc-role' }, t('moderator')),
             h('span', { className: 'mgc-muted' }, t(entry.phase)),
             entry.status !== 'completed' && h('span', { className: 'mgc-muted' }, t(entry.status))),
+          entry.thinking && h('details', { className: 'mgc-thinking', open: entry.status === 'running' },
+            h('summary', null, t('thinking')),
+            h('pre', { className: 'mgc-thinking-text' }, entry.thinking)),
+          entry.activity?.length > 0 && h('ul', { className: 'mgc-activity', 'aria-label': t('toolCall') },
+            entry.activity.map((item, index) => h('li', { key: `${index}:${item.name}` },
+              item.kind === 'tool' ? `${t('toolCall')} · ${item.name}` : `${item.ok ? '✓' : '✕'} ${item.name}`))),
           h('div', { className: 'mgc-bot-bubble' }, entry.text
             ? h('div', { className: 'mgc-prose' }, h(RichMessage, { text: entry.text, renderFactorySlot }))
             : h('div', { className: 'mgc-muted' }, entry.code && Object.hasOwn(en, entry.code) ? t(entry.code) : t(entry.status === 'running' ? 'working' : 'noAnswer')))));
@@ -611,7 +629,13 @@ window.__ModuleLoader__.load({
           h('div', { className: 'mgc-muted' }, t('me'), direct ? ` → ${direct}` : '', ' · ', h('time', { dateTime: turn.createdAt }, timestamp)),
           h('div', { className: 'mgc-user-bubble' }, turn.text),
           turn.fileAccessed === true && h('p', { className: 'mgc-muted' }, t('fileAccessed')),
-          turn.attachments?.length > 0 && h('div', { className: 'mgc-attachments' },
+          turn.changes?.length > 0 && h('details', { className: 'mgc-changes' },
+          h('summary', null, `${t('changedFiles')} (${turn.changes.length})`),
+          turn.changes.map((item, index) => h('div', { key: `${index}:${item.path}`, className: 'mgc-change' },
+            h('strong', null, item.path),
+            item.oldText && h('pre', { className: 'mgc-change-old' }, item.oldText),
+            h('pre', { className: 'mgc-change-new' }, item.newText || t('noDiff'))))),
+        turn.attachments?.length > 0 && h('div', { className: 'mgc-attachments' },
             turn.attachments.map((item, index) => h('span', { key: `${index}:${item.name}`, className: 'mgc-attachment' },
               `${item.kind === 'image' ? '🖼 ' : ''}${item.name}`))),
           turn.project?.files?.length > 0 && h('details', { className: 'mgc-project-context', open: false },
