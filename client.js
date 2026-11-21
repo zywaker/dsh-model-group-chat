@@ -51,6 +51,8 @@ window.__ModuleLoader__.load({
       projectContext: 'Project excerpts', truncatedExcerpt: 'Excerpt truncated',
       unknownRead: 'Could not load this view. Refresh and try again.', unknownCreate: 'Creation could not be confirmed. Retrying with the same details will not create a duplicate.',
       unknownStop: 'Could not confirm that the discussion stopped. Refresh to check its status.',
+      writerReadOnlyHint: 'File access is read-only, so members only advise. Set Project file access to Workspace write or Full access to let the writing member change files.',
+      writerMissingHint: 'This broadcast has no writing member, so members can only read. Assign one in Group settings, or send to one member.',
       thinking: 'Reasoning', thinkingNow: 'Thinking', thinkingDone: 'Thought for {seconds}s', toolCall: 'Tool', changedFiles: 'Changed files', noDiff: 'No text diff available.',
       attach: 'Add files or images', removeAttachment: 'Remove attachment', attachFailed: 'Could not attach this file.', attachedFiles: 'Attachments',
       recipient: 'Send to', everyone: 'All members', me: 'You', placeholder: 'Type a question or a follow-up…',
@@ -128,6 +130,8 @@ window.__ModuleLoader__.load({
       projectContext: '项目摘录', truncatedExcerpt: '摘录已截断',
       unknownRead: '无法加载当前内容，请刷新重试。', unknownCreate: '无法确认是否创建成功。用相同设置重试不会重复创建。',
       unknownStop: '无法确认是否已停止，请刷新查看状态。',
+      writerReadOnlyHint: '当前是「仅可查看」，模型只会给建议。要在群发时让写入成员改文件，请在群聊设置里把项目文件权限切到「工作区内修改」或「完全权限」。',
+      writerMissingHint: '这次群发没有指定写入成员，模型只能读取。可在群聊设置里指定一位写入成员，或定向发送给某一位成员。',
       thinking: '思考过程', thinkingNow: '思考中', thinkingDone: '已思考 {seconds} 秒', toolCall: '工具调用', changedFiles: '已修改文件', noDiff: '没有可显示的文本差异。',
       attach: '添加文件或图片', removeAttachment: '移除附件', attachFailed: '附件上传失败。', attachedFiles: '附件',
       recipient: '发送给', everyone: '全体成员', me: '你', placeholder: '输入问题或继续追问…',
@@ -222,6 +226,7 @@ window.__ModuleLoader__.load({
       .mgc-recipient{position:relative;min-width:0;max-width:calc(100% - 48px);z-index:3}.mgc-page .mgc-recipient-trigger{display:flex;align-items:center;gap:8px;min-width:0;max-width:min(360px,100%);padding:5px 10px;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-lg,14px);background:var(--dsw-alias-bg-base);font-size:13px}.mgc-recipient-trigger>svg{flex:none}.mgc-recipient-menu{position:absolute;inset-inline-start:0;inset-block-end:calc(100% + 6px);min-width:100%;width:min(360px,calc(100cqw - 56px));max-height:min(220px,35dvh);overflow:auto;padding:4px;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-panel,14px);background:var(--dsw-alias-bg-base);box-shadow:var(--dsw-elevation-soft)}.mgc-recipient-option{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:33px;padding:5px 8px;border-radius:var(--dsw-radius-md,8px);cursor:pointer;font-size:13px}.mgc-recipient-option:focus,.mgc-recipient-option:hover,.mgc-recipient-option[aria-selected='true']{background:var(--dsw-alias-interactive-bg-hover)}.mgc-recipient-option:focus-visible{outline-offset:-2px}
       .mgc-recipient-trigger[aria-expanded='true']>svg{transform:rotate(180deg)}.mgc-recipient-menu:popover-open{position:fixed;inset:auto;margin:0;box-sizing:border-box;width:var(--mgc-menu-width);min-width:0;max-height:var(--mgc-menu-height);left:var(--mgc-menu-left);top:var(--mgc-menu-top);color:var(--dsw-alias-label-primary)}
       .mgc-free-talk{flex:none;white-space:nowrap}.mgc-free-talk[aria-pressed=true]{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-interactive-bg-hover)}.mgc-send-active{outline:2px solid var(--dsw-alias-button-info-fill);outline-offset:2px}
+      .mgc-writer-hint{margin:0;padding:0 2px;font-size:12px;line-height:1.5}
       .mgc-attachments{display:flex;flex-wrap:wrap;gap:6px;margin:0 auto 6px;width:min(100%,calc(var(--mgc-chat-width,748px) + 32px))}.mgc-attachment{display:inline-flex;align-items:center;gap:4px;max-width:100%;padding:2px 4px 2px 8px;border-radius:9px;background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-secondary);font-size:12px}.mgc-attachment .mgc-truncate{max-width:220px}
       .mgc-compose-bar{display:flex;justify-content:space-between;align-items:center;gap:10px}.mgc-compose-controls{display:flex;flex-wrap:wrap;align-items:center;gap:4px;min-width:0}.mgc-compose-controls .mgc-recipient{max-width:100%}.mgc-compose-progress{min-width:0;margin-inline-start:auto;text-align:end}.mgc-small-select{font-size:13px!important;max-width:min(280px,100%);cursor:pointer}
       .mgc-project-toggle{display:inline-flex;align-items:center;gap:6px;min-height:30px;padding:2px 7px;border-radius:var(--dsw-radius-md,8px);color:var(--dsw-alias-label-secondary);font-size:13px;cursor:pointer}
@@ -1212,6 +1217,8 @@ window.__ModuleLoader__.load({
             readError && h(Notice, { role: 'alert' }, errText(t, readError), ' ', h('button', { type: 'button', className: 'mgc-quiet', onClick: () => setReload(n => n + 1) }, t('retry'))),
             !room.workspaceAvailable && h(Notice, null, t('missingWorkspace')),
             room.storageFailed && h(Notice, { role: 'alert' }, t('storageFailed')),
+            projectAccess && fileModeOf(room) === 'read-only' && h('p', { className: 'mgc-muted mgc-writer-hint' }, t('writerReadOnlyHint')),
+            projectAccess && room.members.length > 1 && !room.writerKey && h('p', { className: 'mgc-muted mgc-writer-hint' }, t('writerMissingHint')),
             missingAudience && h(Notice, { role: 'alert' }, t('formerAudience')),
             actionError && h(Notice, { role: 'alert' }, errText(t, actionError.err,
             actionError.which === 'send' ? 'unknownError' : actionError.which === 'folder' ? 'folderPickerUnavailable'
