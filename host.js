@@ -209,7 +209,7 @@ function participantSystem(phase, personalRole, rolePrompt, tools = []) {
   ].filter(Boolean).join('\n\n');
 }
 export function createProviderCaller(llm, timeoutMs = 120000) {
-  return ({ model, phase, text, signal, fileAccess, attachments = [] }) => deadline(signal, timeoutMs, async callSignal => {
+  return ({ model, phase, text, signal, fileAccess, attachments = [], progress = () => {} }) => deadline(signal, timeoutMs, async callSignal => {
     const access = fileAccess?.(callSignal);
     const tools = access?.schemas ?? [];
     const imageBlocks = attachments.flatMap(item => (item?.kind === 'image' ? item.blocks ?? [] : []));
@@ -247,6 +247,7 @@ export function createProviderCaller(llm, timeoutMs = 120000) {
           const type = chunk.type === 'text-delta' ? 'text' : 'reasoning';
           const prior = previews.get(chunk.index)?.text ?? '';
           previews.set(chunk.index, { type, text: clipped(prior + chunk.text, LIMITS.text + 1) });
+          if (type === 'reasoning') progress({ type: 'thinking', text: chunk.text });
         } else if (chunk.type === 'block-end') {
           if (!Number.isSafeInteger(chunk.index) || chunk.index < 0 || chunk.index > 63) throw codeError('CALL_FAILED');
           blocks.set(chunk.index, chunk.block);
@@ -275,8 +276,10 @@ export function createProviderCaller(llm, timeoutMs = 120000) {
           source: { kind: 'model', provider: model.provider, model: model.model, ...(replaySafe && replayState !== undefined ? { replayState } : {}) } });
         for (const call of calls) {
           callSignal.throwIfAborted();
+          progress({ type: 'tool', name: call.name });
           executed++;
           const result = tools.some(tool => tool.name === call.name) ? await access.execute(call) : { ok: false, error: 'Unknown or unavailable project tool.' };
+          progress({ type: 'tool-done', name: call.name, ok: result?.ok === true, path: result?.path });
           callSignal.throwIfAborted();
           const body = JSON.stringify(result);
           const safeBody = body && body.length <= MAX_TOOL_RESULT_CHARS ? body : JSON.stringify({ ok: false, error: 'Result exceeds the tool response budget. Ask for a smaller read.' });
@@ -470,10 +473,32 @@ export function createChatService({ table, registry, llm, log = () => {}, timeou
     const writer = room.writerKey ?? turn.recipientKey ?? (room.memberKeys.length === 1 ? room.memberKeys[0] : null);
     const written = [];
     let successfulWrites = 0;
+    const live = new Map();
+    let progressTimer;
+    function recordProgress(modelKey, piece) {
+      const state = live.get(modelKey) ?? { thinking: '', activity: [] };
+      if (piece.type === 'thinking') state.thinking = `${state.thinking}${piece.text}`.slice(-4_000);
+      else if (piece.type === 'tool') state.activity = [...state.activity, { kind: 'tool', name: piece.name, at: new Date().toISOString() }].slice(-12);
+      else if (piece.type === 'tool-done') state.activity = [...state.activity, { kind: 'result', name: piece.name, ok: piece.ok, at: new Date().toISOString() }].slice(-12);
+      live.set(modelKey, state);
+      if (progressTimer) return;
+      progressTimer = setTimeout(() => {
+        progressTimer = undefined;
+        const snapshot = new Map([...live].map(([key, value]) => [key, { ...value, activity: [...value.activity] }]));
+        persist(room.id, current => {
+          const last = current.turns.at(-1);
+          if (last?.id !== turn.id || last.status !== 'running') return current;
+          return withTurn(current, { ...last, entries: last.entries.map(entry => snapshot.has(entry.modelKey) && entry.status === 'running'
+            ? { ...entry, thinking: snapshot.get(entry.modelKey).thinking, activity: snapshot.get(entry.modelKey).activity }
+            : entry) });
+        }).catch(() => {});
+      }, 900);
+      progressTimer.unref?.();
+    }
     const outsideAllowed = new Set(Array.from(turn.text.matchAll(/"([^"\r\n]+)"|`([^`\r\n]+)`/g), match => match[1] ?? match[2]));
     active.set(room.id, running);
     const names = new Map(room.members.map(member => [member.key, member]));
-    const participant = args => call({ ...args, attachments: turn.attachments ?? [],
+    const participant = args => call({ ...args, attachments: turn.attachments ?? [], progress: piece => recordProgress(args.model.key, piece),
       ...(root && capabilities.projectAccess && args.phase !== 'summary' ? {
         fileAccess: signal => {
           let approvedChange;
@@ -515,6 +540,14 @@ export function createChatService({ table, registry, llm, log = () => {}, timeou
             approvedChange = undefined;
             const result = await access.execute(request);
             if (result.ok && (result.operation === 'edit' || result.operation === 'create')) {
+              const change = { path: result.path, operation: result.operation,
+                oldText: result.operation === 'edit' ? String(approvedChange?.oldText ?? '').slice(0, 2_000) : '',
+                newText: String(approvedChange?.newText ?? '').slice(0, 2_000) };
+              await persist(room.id, current => {
+                const last = current.turns.at(-1);
+                if (last?.id !== turn.id) return current;
+                return withTurn(current, { ...last, changes: [...(last.changes ?? []), change].slice(-6) });
+              }).catch(() => {});
               successfulWrites++;
               if (approvedChange?.operation === result.operation) written.push({ path: result.path, operation: result.operation,
                 ...(result.operation === 'edit' && { oldText: approvedChange.oldText }), newText: approvedChange.newText });
@@ -533,7 +566,13 @@ export function createChatService({ table, registry, llm, log = () => {}, timeou
         if (controller.signal.aborted && next.status !== 'running' && next.status !== 'cancelled') {
           return withTurn(current, settleTurn(next, 'cancelled', 'CANCELLED'));
         }
-        return withTurn(current, current.turns.at(-1).fileAccessed ? { ...next, fileAccessed: true } : next);
+        // The engine rewrites the turn from its own draft; keep out-of-band
+        // fields such as the applied-change log and live progress.
+        const previous = current.turns.at(-1);
+        const extra = {};
+        if (previous?.changes) extra.changes = previous.changes;
+        return withTurn(current, { ...next, ...extra,
+          ...(previous?.fileAccessed || next.fileAccessed ? { fileAccessed: true } : {}) });
       }),
     })).catch(async () => {
       const cancelledByUser = controller.signal.aborted;
