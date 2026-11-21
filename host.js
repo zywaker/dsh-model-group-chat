@@ -476,8 +476,12 @@ export function createChatService({ table, registry, llm, log = () => {}, timeou
     const live = new Map();
     let progressTimer;
     function recordProgress(modelKey, piece) {
-      const state = live.get(modelKey) ?? { thinking: '', activity: [] };
-      if (piece.type === 'thinking') state.thinking = `${state.thinking}${piece.text}`.slice(-4_000);
+      const state = live.get(modelKey) ?? { thinking: '', activity: [], startedAt: undefined };
+      if (piece.type === 'thinking') {
+        state.startedAt ??= Date.now();
+        state.thinking = `${state.thinking}${piece.text}`.slice(-4_000);
+        state.thinkingMs = Date.now() - state.startedAt;
+      }
       else if (piece.type === 'tool') state.activity = [...state.activity, { kind: 'tool', name: piece.name, at: new Date().toISOString() }].slice(-12);
       else if (piece.type === 'tool-done') state.activity = [...state.activity, { kind: 'result', name: piece.name, ok: piece.ok, at: new Date().toISOString() }].slice(-12);
       live.set(modelKey, state);
@@ -489,7 +493,8 @@ export function createChatService({ table, registry, llm, log = () => {}, timeou
           const last = current.turns.at(-1);
           if (last?.id !== turn.id || last.status !== 'running') return current;
           return withTurn(current, { ...last, entries: last.entries.map(entry => snapshot.has(entry.modelKey) && entry.status === 'running'
-            ? { ...entry, thinking: snapshot.get(entry.modelKey).thinking, activity: snapshot.get(entry.modelKey).activity }
+            ? { ...entry, thinking: snapshot.get(entry.modelKey).thinking, activity: snapshot.get(entry.modelKey).activity,
+              ...(snapshot.get(entry.modelKey).thinkingMs ? { thinkingMs: snapshot.get(entry.modelKey).thinkingMs } : {}) }
             : entry) });
         }).catch(() => {});
       }, 200);
@@ -498,7 +503,7 @@ export function createChatService({ table, registry, llm, log = () => {}, timeou
     const outsideAllowed = new Set(Array.from(turn.text.matchAll(/"([^"\r\n]+)"|`([^`\r\n]+)`/g), match => match[1] ?? match[2]));
     active.set(room.id, running);
     const names = new Map(room.members.map(member => [member.key, member]));
-    const participant = args => call({ ...args, attachments: turn.attachments ?? [], progress: piece => { if (args.model.key === writer && mode !== 'read-only') recordProgress(args.model.key, piece); },
+    const participant = args => call({ ...args, attachments: turn.attachments ?? [], progress: piece => recordProgress(args.model.key, piece),
       ...(root && capabilities.projectAccess && args.phase !== 'summary' ? {
         fileAccess: signal => {
           let approvedChange;
