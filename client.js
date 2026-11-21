@@ -1,5 +1,5 @@
 window.__ModuleLoader__.load({
-  id: '@local/dsh-model-group-chat',
+  id: 'dsh-model-group-chat',
   factory(require) {
     const React = require('react');
     const { createElement: h, Fragment, useId, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } = React;
