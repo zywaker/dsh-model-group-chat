@@ -594,6 +594,26 @@ window.__ModuleLoader__.load({
       // Golden-angle spacing keeps two to four members visibly distinct.
       return Math.round(order >= 0 ? (205 + order * 137.508) % 360 : hueOf(key));
     }
+    // Reveal streamed reasoning between polls so it reads as continuous text
+    // instead of a once-per-second jump.
+    function ThinkingStream({ text, running }) {
+      const target = text ?? '';
+      const [shown, setShown] = useState(target);
+      const box = useRef(null);
+      useEffect(() => { setShown(current => (target.startsWith(current) ? current : target)); }, [target]);
+      useEffect(() => {
+        if (shown.length >= target.length) return undefined;
+        const timer = setTimeout(() => {
+          const remaining = target.length - shown.length;
+          setShown(target.slice(0, shown.length + Math.max(1, Math.ceil(remaining / 8))));
+        }, 24);
+        return () => clearTimeout(timer);
+      }, [shown, target]);
+      useEffect(() => {
+        if (box.current) box.current.scrollTop = box.current.scrollHeight;
+      }, [shown]);
+      return h('pre', { className: 'mgc-thinking-text', ref: box, 'aria-live': 'polite' }, shown || (running ? '…' : ''));
+    }
     function Entry({ t, entry, renderFactorySlot, order = -1 }) {
       const initial = Array.from(entry.label.trim())[0]?.toLocaleUpperCase() || '·';
       return h('div', { className: 'mgc-bot', 'data-phase': entry.phase }, h('span', { className: 'mgc-avatar',
@@ -606,7 +626,7 @@ window.__ModuleLoader__.load({
             entry.status !== 'completed' && h('span', { className: 'mgc-muted' }, t(entry.status))),
           entry.thinking && h('details', { className: 'mgc-thinking', open: entry.status === 'running' },
             h('summary', null, t('thinking')),
-            h('pre', { className: 'mgc-thinking-text' }, entry.thinking)),
+            h(ThinkingStream, { text: entry.thinking, running: entry.status === 'running' })),
           entry.activity?.length > 0 && h('ul', { className: 'mgc-activity', 'aria-label': t('toolCall') },
             entry.activity.map((item, index) => h('li', { key: `${index}:${item.name}` },
               item.kind === 'tool' ? `${t('toolCall')} · ${item.name}` : `${item.ok ? '✓' : '✕'} ${item.name}`))),
@@ -1011,7 +1031,7 @@ window.__ModuleLoader__.load({
             // Do not resurrect an approval from a read started before a newer local observation.
             if (startedEpoch === detailEpoch.current || !last.current || result.revision > last.current.revision) accept(result);
           } catch (err) { if (!ctl.signal.aborted) setReadError(err); }
-          if (!ctl.signal.aborted && last.current?.active) timer = window.setTimeout(query, 1100);
+          if (!ctl.signal.aborted && last.current?.active) timer = window.setTimeout(query, 400);
         }
         query();
         return () => { ctl.abort(); window.clearTimeout(timer); };
