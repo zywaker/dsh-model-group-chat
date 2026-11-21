@@ -51,7 +51,7 @@ window.__ModuleLoader__.load({
       projectContext: 'Project excerpts', truncatedExcerpt: 'Excerpt truncated',
       unknownRead: 'Could not load this view. Refresh and try again.', unknownCreate: 'Creation could not be confirmed. Retrying with the same details will not create a duplicate.',
       unknownStop: 'Could not confirm that the discussion stopped. Refresh to check its status.',
-      thinking: 'Reasoning', toolCall: 'Tool', changedFiles: 'Changed files', noDiff: 'No text diff available.',
+      thinking: 'Reasoning', thinkingNow: 'Thinking', thinkingDone: 'Thought for {seconds}s', toolCall: 'Tool', changedFiles: 'Changed files', noDiff: 'No text diff available.',
       attach: 'Add files or images', removeAttachment: 'Remove attachment', attachFailed: 'Could not attach this file.', attachedFiles: 'Attachments',
       recipient: 'Send to', everyone: 'All members', me: 'You', placeholder: 'Type a question or a follow-up…',
       send: 'Send to group', sendOne: 'Send to member', cancel: 'Stop', stopping: 'Stopping…', older: 'Show earlier messages',
@@ -128,7 +128,7 @@ window.__ModuleLoader__.load({
       projectContext: '项目摘录', truncatedExcerpt: '摘录已截断',
       unknownRead: '无法加载当前内容，请刷新重试。', unknownCreate: '无法确认是否创建成功。用相同设置重试不会重复创建。',
       unknownStop: '无法确认是否已停止，请刷新查看状态。',
-      thinking: '思考过程', toolCall: '工具调用', changedFiles: '已修改文件', noDiff: '没有可显示的文本差异。',
+      thinking: '思考过程', thinkingNow: '思考中', thinkingDone: '已思考 {seconds} 秒', toolCall: '工具调用', changedFiles: '已修改文件', noDiff: '没有可显示的文本差异。',
       attach: '添加文件或图片', removeAttachment: '移除附件', attachFailed: '附件上传失败。', attachedFiles: '附件',
       recipient: '发送给', everyone: '全体成员', me: '你', placeholder: '输入问题或继续追问…',
       send: '发给群成员', sendOne: '发给指定成员', cancel: '停止', stopping: '正在停止…', older: '展开更早的消息',
@@ -192,7 +192,12 @@ window.__ModuleLoader__.load({
       .mgc-thinking{margin-block:0 6px;font-size:12px;color:var(--dsw-alias-label-secondary)}
       .mgc-thinking summary{cursor:pointer;width:fit-content}
       .mgc-thinking-text{max-block-size:min(30dvh,220px);overflow:auto;margin:5px 0 0;padding:7px 9px;white-space:pre-wrap;overflow-wrap:anywhere;border-radius:9px;background:var(--dsw-alias-interactive-bg-hover);font-size:12px;line-height:1.55}
+      .mgc-thinking summary{display:flex;align-items:center;gap:6px;width:fit-content;cursor:pointer;list-style:none;color:var(--dsw-alias-label-secondary);font-size:12px}
+      .mgc-thinking summary::-webkit-details-marker{display:none}
+      .mgc-thinking summary:before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.55;flex:none}
+      .mgc-thinking[open] summary:before{background:var(--dsw-alias-state-business-primary);opacity:1}
       .mgc-activity{display:grid;gap:3px;margin:0 0 6px;padding:0;list-style:none;font-size:12px;color:var(--dsw-alias-label-secondary)}
+      .mgc-activity li{display:flex;gap:6px;align-items:baseline}.mgc-activity li:before{content:'';width:4px;height:4px;border-radius:50%;background:currentColor;opacity:.45;flex:none}
       .mgc-changes{margin-block:8px 12px;font-size:12px}
       .mgc-changes summary{cursor:pointer;width:fit-content;color:var(--dsw-alias-label-secondary)}
       .mgc-change{display:grid;gap:4px;margin-block-start:6px;padding:7px 9px;border:1px solid var(--dsw-alias-border-l3);border-radius:10px}
@@ -625,7 +630,8 @@ window.__ModuleLoader__.load({
             h('span', { className: 'mgc-muted' }, t(entry.phase)),
             entry.status !== 'completed' && h('span', { className: 'mgc-muted' }, t(entry.status))),
           entry.thinking && h('details', { className: 'mgc-thinking', open: entry.status === 'running' },
-            h('summary', null, t('thinking')),
+            h('summary', null, entry.status === 'running' ? t('thinkingNow')
+              : entry.thinkingMs ? t('thinkingDone', { seconds: Math.max(1, Math.round(entry.thinkingMs / 1000)) }) : t('thinking')),
             h(ThinkingStream, { text: entry.thinking, running: entry.status === 'running' })),
           entry.activity?.length > 0 && h('ul', { className: 'mgc-activity', 'aria-label': t('toolCall') },
             entry.activity.map((item, index) => h('li', { key: `${index}:${item.name}` },
