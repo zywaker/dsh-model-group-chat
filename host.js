@@ -492,13 +492,13 @@ export function createChatService({ table, registry, llm, log = () => {}, timeou
             ? { ...entry, thinking: snapshot.get(entry.modelKey).thinking, activity: snapshot.get(entry.modelKey).activity }
             : entry) });
         }).catch(() => {});
-      }, 900);
+      }, 200);
       progressTimer.unref?.();
     }
     const outsideAllowed = new Set(Array.from(turn.text.matchAll(/"([^"\r\n]+)"|`([^`\r\n]+)`/g), match => match[1] ?? match[2]));
     active.set(room.id, running);
     const names = new Map(room.members.map(member => [member.key, member]));
-    const participant = args => call({ ...args, attachments: turn.attachments ?? [], progress: piece => recordProgress(args.model.key, piece),
+    const participant = args => call({ ...args, attachments: turn.attachments ?? [], progress: piece => { if (args.model.key === writer && mode !== 'read-only') recordProgress(args.model.key, piece); },
       ...(root && capabilities.projectAccess && args.phase !== 'summary' ? {
         fileAccess: signal => {
           let approvedChange;
