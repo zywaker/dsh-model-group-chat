@@ -4,7 +4,7 @@ import { MAX_TURN_ENTRIES } from './engine.js';
 
 const LEGACY_PROJECT_FILES = 3;
 
-export const inject = ['connection', 'llm', 'workspaceRegistry', 'storageDomain', 'fs'];
+export const inject = ['connection', 'llm', 'workspaceRegistry', 'storageDomain', 'fs', 'attachments'];
 const phases = new Set(['ideas', 'review', 'summary', 'reply', 'dialogue', 'change-review']);
 const turnStates = new Set(['running', 'completed', 'partial', 'failed', 'cancelled', 'interrupted']);
 const entryStates = new Set(['running', 'completed', 'failed', 'cancelled']);
@@ -139,7 +139,7 @@ export function apply(ctx) {
       put: (id, room) => raw.put(id, validateRoom(room)), delete: id => raw.delete(id),
       update: (id, transform) => raw.update(id, room => validateRoom(transform(room))),
     };
-    service = createChatService({ table, registry: ctx.workspaceRegistry, llm: ctx.llm, fs: ctx.fs, log });
+    service = createChatService({ table, registry: ctx.workspaceRegistry, llm: ctx.llm, fs: ctx.fs, log, attachments: ctx.attachments });
     await service.recover();
     if (!disposed) {
       release = ctx.connection.fetch.register({ path: '/api/model-group-chat', methods: ['POST'], requestBody: 'streaming', fetch: createRoute(service, log) });
