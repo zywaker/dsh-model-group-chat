@@ -26,3 +26,16 @@
 Use New group chat beside New Session and bind a local folder above the composer. Group Settings controls the roster and file access. The default read-only mode lists and reads eligible project text on demand after a user send. Workspace write adds per-change approved edits and creates; Full access also permits explicitly quoted outside absolute paths from the current user message. No shell or file deletion is available. All participating models read according to the selected mode. Assign a writing member for group sends; if unassigned, only the direct recipient or the sole member can propose writes. Other participants review applied changes in group sends without write access. For two or more models, enable Free discussion in the composer to let them ask and answer each other. Click the send button in its Stop state to end it; the mode admits at most 24 follow-up messages per send.
 
 For developers: run `npm test` in the source directory. Tests use deterministic mock model routes, not paid requests or workspace data.
+
+## 安装 / Install
+
+DSH 0.2.2-rc.5 起可用：
+
+```powershell
+dsh plugin add github:zywaker/dsh-model-group-chat
+# 或固定版本
+dsh plugin add github:zywaker/dsh-model-group-chat#v1.15.0
+```
+
+安装后在「新会话」旁出现「新群聊」，或在插件市场搜索本插件。
+
