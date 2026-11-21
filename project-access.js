@@ -38,7 +38,7 @@ const ERRORS = Object.freeze({
   tooLarge: 'The file, listing, or proposed change exceeds the project tool limit.',
   credential: 'Credential-like material was blocked.',
   stale: 'The project path changed; restart the listing or read before continuing.',
-  cursor: 'Invalid continuation cursor for this project operation.',
+  cursor: 'The continuation cursor was not recognized. Call the same tool again without cursor to restart from the first page.',
   ambiguous: 'This text window could not be safely screened for credentials.',
   conflict: 'The destination already exists; create will not overwrite it.',
   literal: 'The old text must occur exactly once and the edit must change it.',
@@ -81,6 +81,8 @@ const definitions = [
 ];
 
 const samePath = (a, b) => typeof a === 'string' && typeof b === 'string' && path.relative(a, b) === '';
+// Stable across calls so a continuation still works in a later step or phase.
+const cursorKey = randomBytes(32);
 function contained(dir, candidate) {
   const rel = path.relative(dir, candidate);
   return rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel);
@@ -231,7 +233,6 @@ export function createProjectAccess({ fs, root, mode, allowWrites, approve, sign
       before.chain.join('|') === after.chain.join('|') &&
       (before.leaf ? after.leaf && norm(before.leaf) === norm(after.leaf) : !after.leaf);
   }
-  const cursorKey = randomBytes(32);
   function scope(kind, selected) {
     return createHash('sha256').update(JSON.stringify([
       kind, selected.target.targetKey, selected.info.version, selected.chain, stamp(selected.leaf),
@@ -242,7 +243,9 @@ export function createProjectAccess({ fs, root, mode, allowWrites, approve, sign
     return `${payload}.${createHmac('sha256', cursorKey).update(payload).digest('base64url')}`;
   }
   function cursorPosition(cursor, snapshot) {
-    const parts = cursor.match(/^([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]{43})$/u);
+    // Models sometimes echo the schema wording instead of a value.
+    if (typeof cursor !== 'string' || /^(?:nextcursor|null|undefined|none|-)?$/iu.test(cursor.trim())) return 0;
+    const parts = cursor.trim().match(/^([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]{43})$/u);
     if (!parts) reject('cursor');
     const expected = createHmac('sha256', cursorKey).update(parts[1]).digest();
     const tag = Buffer.from(parts[2], 'base64url');
@@ -275,7 +278,7 @@ export function createProjectAccess({ fs, root, mode, allowWrites, approve, sign
     const fresh = await getTarget(value);
     if (!matchTarget(selected, fresh) || !(bytes instanceof Uint8Array) || bytes.byteLength !== size) reject('stale');
     const snapshot = scope(`read:${createHash('sha256').update(bytes).digest('hex')}`, fresh);
-    const position = cursor === undefined ? 0 : cursorPosition(cursor, snapshot);
+    const position = cursorPosition(cursor, snapshot);
     if (!Number.isSafeInteger(position) || position < 0 || position > size) reject('cursor');
     let screened;
     try { screened = new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch { reject('nontext'); }
@@ -334,7 +337,7 @@ export function createProjectAccess({ fs, root, mode, allowWrites, approve, sign
     const latest = await getTarget(value, { directory: true });
     if (!matchTarget(fresh, latest, true) || stamp(fresh.leaf) !== stamp(latest.leaf)) reject('stale');
     const snapshot = scope(`list:${createHash('sha256').update(JSON.stringify(visible)).digest('hex')}`, latest);
-    const position = cursor === undefined ? 0 : cursorPosition(cursor, snapshot);
+    const position = cursorPosition(cursor, snapshot);
     if (!Number.isSafeInteger(position) || position < 0 || position > visible.length) reject('cursor');
     const page = [];
     let wireChars = 0;
